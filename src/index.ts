@@ -50,5 +50,18 @@ export type { Operation, ReceiptInit } from "./receipt.js";
 export { ProvenanceVerifier } from "./verifier.js";
 export type { VerificationReport } from "./verifier.js";
 
+export {
+  InMemorySink,
+  ToolDeniedError,
+  wrapTool,
+  wrapTools,
+} from "./vercel-ai.js";
+export type {
+  CapabilityCheck,
+  CapabilityVerdict,
+  ReceiptSink,
+  WrapToolsOptions,
+} from "./vercel-ai.js";
+
 export const SPEC_URL = "https://raucle.com/spec/provenance/v1";
 export const SPEC_VERSION = "raucle-provenance-receipt/v1";
