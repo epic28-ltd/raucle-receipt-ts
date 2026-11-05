@@ -7,7 +7,7 @@
  */
 
 import { b64urlDecode, b64urlEncode } from "./base64url.js";
-import { canonicalizeBytes } from "./canonical-json.js";
+import { canonicalizeBytes, compareStrings } from "./canonical-json.js";
 import { sha256Hex } from "./hash.js";
 import type { AgentIdentity } from "./identity.js";
 
@@ -99,8 +99,8 @@ export class ProvenanceReceipt {
       agent_id: this.agentId,
       agent_key_id: this.agentKeyId,
       operation: this.operation,
-      parents: [...this.parents].sort(),
-      taint: [...this.taint].sort(),
+      parents: [...this.parents].sort(compareStrings),
+      taint: [...this.taint].sort(compareStrings),
     };
     if (this.inputHash) out["input_hash"] = this.inputHash;
     if (this.outputHash) out["output_hash"] = this.outputHash;
