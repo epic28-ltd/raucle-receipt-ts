@@ -20,7 +20,9 @@
  * implicit default-sort behaviour.
  */
 export function compareStrings(a: string, b: string): number {
-  return a < b ? -1 : a > b ? 1 : 0;
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
 }
 
 export function canonicalize(value: unknown): string {
@@ -60,38 +62,39 @@ export function canonicalize(value: unknown): string {
 function canonicalString(s: string): string {
   let out = '"';
   for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    switch (code) {
+    switch (s.codePointAt(i)) {
       case 0x22:
-        out += '\\"';
+        out += String.raw`\"`;
         break;
       case 0x5c:
-        out += "\\\\";
+        out += String.raw`\\`;
         break;
       case 0x08:
-        out += "\\b";
+        out += String.raw`\b`;
         break;
       case 0x0c:
-        out += "\\f";
+        out += String.raw`\f`;
         break;
       case 0x0a:
-        out += "\\n";
+        out += String.raw`\n`;
         break;
       case 0x0d:
-        out += "\\r";
+        out += String.raw`\r`;
         break;
       case 0x09:
-        out += "\\t";
+        out += String.raw`\t`;
         break;
-      default:
+      default: {
+        const code = s.codePointAt(i)!;
         if (code < 0x20) {
-          out += "\\u" + code.toString(16).padStart(4, "0");
+          out += String.raw`\u` + code.toString(16).padStart(4, "0");
         } else {
           // Includes all printable ASCII and ALL non-ASCII codepoints.
           // Surrogate pairs pass through as the source string carries them —
           // this matches Python's behaviour with ensure_ascii=False.
           out += s[i];
         }
+      }
     }
   }
   return out + '"';
