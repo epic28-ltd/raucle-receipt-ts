@@ -15,7 +15,7 @@ import {
   sign as cryptoSign,
 } from "node:crypto";
 
-import { canonicalize, canonicalizeBytes } from "./canonical-json.js";
+import { canonicalize, canonicalizeBytes, compareStrings } from "./canonical-json.js";
 import { sha256Hex } from "./hash.js";
 
 const AGENT_ID_RE = /^agent:[a-z0-9][a-z0-9_\-./]{0,127}$/;
@@ -77,9 +77,9 @@ export class CapabilityStatement {
       agent_id: this.agentId,
       key_id: this.keyId,
       public_key_pem: this.publicKeyPem,
-      allowed_models: [...this.allowedModels].sort(),
-      allowed_tools: [...this.allowedTools].sort(),
-      data_classifications: [...this.dataClassifications].sort(),
+      allowed_models: [...this.allowedModels].sort(compareStrings),
+      allowed_tools: [...this.allowedTools].sort(compareStrings),
+      data_classifications: [...this.dataClassifications].sort(compareStrings),
       issuer: this.issuer,
       issued_at: this.issuedAt,
       expires_at: this.expiresAt,

@@ -14,6 +14,15 @@
  * the ``ensure_ascii=False`` semantics; this module implements both.
  */
 
+/**
+ * Deterministic code-unit comparator for strings (RFC 8785 / UTF-16 code-unit
+ * order). Explicitly given to Array#sort so key ordering never depends on the
+ * implicit default-sort behaviour.
+ */
+export function compareStrings(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function canonicalize(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) {
@@ -31,7 +40,7 @@ export function canonicalize(value: unknown): string {
   }
   if (t === "object") {
     const obj = value as Record<string, unknown>;
-    const keys = Object.keys(obj).sort();
+    const keys = Object.keys(obj).sort(compareStrings);
     const parts: string[] = [];
     for (const key of keys) {
       const v = obj[key];
