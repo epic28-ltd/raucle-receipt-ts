@@ -15,7 +15,7 @@ import {
   sign as cryptoSign,
 } from "node:crypto";
 
-import { canonicalize, canonicalizeBytes, compareStrings } from "./canonical-json.js";
+import { canonicalizeBytes, compareStrings } from "./canonical-json.js";
 import { sha256Hex } from "./hash.js";
 
 const AGENT_ID_RE = /^agent:[a-z0-9][a-z0-9_\-./]{0,127}$/;
@@ -180,4 +180,4 @@ export function loadPublicKey(pem: string): KeyObject {
 }
 
 /** Used by tests; keeps canonicalize handy at the boundary. */
-export { canonicalize };
+export { canonicalize } from "./canonical-json.js";

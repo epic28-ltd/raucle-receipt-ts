@@ -12,10 +12,14 @@ export function b64urlEncode(data: Uint8Array): string {
   }
   // Browser fallback
   let bin = "";
-  for (let i = 0; i < data.length; i++) {
-    bin += String.fromCharCode(data[i]!);
+  for (const byte of data) {
+    bin += String.fromCodePoint(byte);
   }
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  // `btoa` emits standard base64 with "=" padding; padding sits only at the
+  // tail, so cutting at the first "=" yields the unpadded form.
+  const b64 = btoa(bin);
+  const unpadded = b64.includes("=") ? b64.slice(0, b64.indexOf("=")) : b64;
+  return unpadded.replaceAll("+", "-").replaceAll("/", "_");
 }
 
 export function b64urlDecode(s: string): Uint8Array {
@@ -23,9 +27,9 @@ export function b64urlDecode(s: string): Uint8Array {
     return new Uint8Array(Buffer.from(s, "base64url"));
   }
   const pad = "=".repeat((4 - (s.length % 4)) % 4);
-  const std = (s + pad).replace(/-/g, "+").replace(/_/g, "/");
+  const std = (s + pad).replaceAll("-", "+").replaceAll("_", "/");
   const bin = atob(std);
   const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.codePointAt(i)!;
   return out;
 }

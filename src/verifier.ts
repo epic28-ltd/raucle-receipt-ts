@@ -14,7 +14,6 @@ import { readFileSync } from "node:fs";
 
 import { type KeyObject, verify as cryptoVerify } from "node:crypto";
 
-import { sha256Hex } from "./hash.js";
 import { loadPublicKey } from "./identity.js";
 import { ProvenanceReceipt } from "./receipt.js";
 
@@ -58,44 +57,22 @@ export class ProvenanceVerifier {
 
     const lines = text.split(/\r?\n/);
     const byHash = new Map<string, ProvenanceReceipt>();
-    const storedHashByJws = new Map<string, string>();
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]!.trim();
       if (!line) continue;
-      let raw: Record<string, unknown>;
-      try {
-        raw = JSON.parse(line);
-      } catch (e) {
-        report.errors.push(`line ${i + 1}: invalid JSON: ${(e as Error).message}`);
-        report.valid = false;
-        continue;
-      }
-      const jws = raw["jws"];
-      if (typeof jws !== "string") {
-        report.errors.push(`line ${i + 1}: record has no string 'jws' field`);
-        report.valid = false;
-        continue;
-      }
-      let receipt: ProvenanceReceipt;
-      try {
-        receipt = ProvenanceReceipt.fromJws(jws);
-      } catch (e) {
-        report.errors.push(`line ${i + 1}: malformed receipt: ${(e as Error).message}`);
-        report.valid = false;
-        continue;
-      }
+      const parsed = this.parseRecord(line, i + 1, report);
+      if (!parsed) continue;
+      const { receipt, jws, storedHash } = parsed;
 
       // Tampering: stored receipt_hash must match recomputed
-      const stored = raw["receipt_hash"];
-      if (typeof stored === "string" && stored !== receipt.receiptHash) {
+      if (storedHash !== null && storedHash !== receipt.receiptHash) {
         report.tamperedReceipts.push(receipt.receiptHash);
         report.errors.push(
           `line ${i + 1}: receipt_hash mismatch — record tampered`,
         );
         report.valid = false;
       }
-      storedHashByJws.set(jws, typeof stored === "string" ? stored : receipt.receiptHash);
 
       // Signature
       if (!this.verifySignature(receipt)) {
@@ -126,6 +103,43 @@ export class ProvenanceVerifier {
     }
 
     return report;
+  }
+
+  /**
+   * Parse one JSONL record. On failure this records the error into ``report``
+   * (marking it invalid) and returns null; on success it returns the receipt,
+   * its JWS and the record's stored receipt_hash (null when absent).
+   */
+  private parseRecord(
+    line: string,
+    lineNumber: number,
+    report: VerificationReport,
+  ): { receipt: ProvenanceReceipt; jws: string; storedHash: string | null } | null {
+    let raw: Record<string, unknown>;
+    try {
+      raw = JSON.parse(line);
+    } catch (e) {
+      report.errors.push(`line ${lineNumber}: invalid JSON: ${(e as Error).message}`);
+      report.valid = false;
+      return null;
+    }
+    const jws = raw["jws"];
+    if (typeof jws !== "string") {
+      report.errors.push(`line ${lineNumber}: record has no string 'jws' field`);
+      report.valid = false;
+      return null;
+    }
+    let receipt: ProvenanceReceipt;
+    try {
+      receipt = ProvenanceReceipt.fromJws(jws);
+    } catch (e) {
+      report.errors.push(`line ${lineNumber}: malformed receipt: ${(e as Error).message}`);
+      report.valid = false;
+      return null;
+    }
+    const stored = raw["receipt_hash"];
+    const storedHash = typeof stored === "string" ? stored : null;
+    return { receipt, jws, storedHash };
   }
 
   /** Walk the DAG backwards from ``receiptHash`` to all roots. */
@@ -175,34 +189,50 @@ export class ProvenanceVerifier {
       const parent = byHash.get(p);
       if (parent) for (const t of parent.taint) inherited.add(t);
     }
-    const mine = new Set(receipt.taint);
-
     if (receipt.operation === "sanitisation") {
-      let removed = new Set<string>();
-      if (receipt.corpus.startsWith("removed:")) {
-        removed = new Set(
-          receipt.corpus.slice("removed:".length).split(",").filter(Boolean),
-        );
-      }
-      const expected = new Set<string>();
-      for (const t of inherited) if (!removed.has(t)) expected.add(t);
-      if (!setsEqual(expected, mine)) {
-        report.taintMonotonicityFailures += 1;
-        report.errors.push(
-          `receipt ${receipt.receiptHash}: sanitisation taint mismatch`,
-        );
-        report.valid = false;
-      }
+      this.checkSanitisationTaint(receipt, inherited, report);
     } else {
-      const missing = [...inherited].filter((t) => !mine.has(t));
-      if (missing.length > 0) {
-        report.taintMonotonicityFailures += 1;
-        report.errors.push(
-          `receipt ${receipt.receiptHash}: taint not monotonic — ` +
-            `dropped ${JSON.stringify(missing)} without a sanitisation step`,
-        );
-        report.valid = false;
-      }
+      this.checkMonotonicTaint(receipt, inherited, report);
+    }
+  }
+
+  private checkSanitisationTaint(
+    receipt: ProvenanceReceipt,
+    inherited: Set<string>,
+    report: VerificationReport,
+  ): void {
+    const mine = new Set(receipt.taint);
+    let removed = new Set<string>();
+    if (receipt.corpus.startsWith("removed:")) {
+      removed = new Set(
+        receipt.corpus.slice("removed:".length).split(",").filter(Boolean),
+      );
+    }
+    const expected = new Set<string>();
+    for (const t of inherited) if (!removed.has(t)) expected.add(t);
+    if (!setsEqual(expected, mine)) {
+      report.taintMonotonicityFailures += 1;
+      report.errors.push(
+        `receipt ${receipt.receiptHash}: sanitisation taint mismatch`,
+      );
+      report.valid = false;
+    }
+  }
+
+  private checkMonotonicTaint(
+    receipt: ProvenanceReceipt,
+    inherited: Set<string>,
+    report: VerificationReport,
+  ): void {
+    const mine = new Set(receipt.taint);
+    const missing = [...inherited].filter((t) => !mine.has(t));
+    if (missing.length > 0) {
+      report.taintMonotonicityFailures += 1;
+      report.errors.push(
+        `receipt ${receipt.receiptHash}: taint not monotonic — ` +
+          `dropped ${JSON.stringify(missing)} without a sanitisation step`,
+      );
+      report.valid = false;
     }
   }
 
