@@ -63,7 +63,7 @@ export class ProvenanceVerifier {
       if (!line) continue;
       const parsed = this.parseRecord(line, i + 1, report);
       if (!parsed) continue;
-      const { receipt, jws, storedHash } = parsed;
+      const { receipt, storedHash } = parsed;
 
       // Tampering: stored receipt_hash must match recomputed
       if (storedHash !== null && storedHash !== receipt.receiptHash) {
@@ -88,7 +88,16 @@ export class ProvenanceVerifier {
       report.receiptCount += 1;
     }
 
-    // DAG integrity + taint monotonicity
+    this.checkDagIntegrity(byHash, report);
+
+    return report;
+  }
+
+  /** Parent links must resolve inside the chain; taint must stay monotonic. */
+  private checkDagIntegrity(
+    byHash: Map<string, ProvenanceReceipt>,
+    report: VerificationReport,
+  ): void {
     for (const receipt of byHash.values()) {
       for (const parentHash of receipt.parents) {
         if (!byHash.has(parentHash)) {
@@ -101,8 +110,6 @@ export class ProvenanceVerifier {
       }
       this.checkTaint(receipt, byHash, report);
     }
-
-    return report;
   }
 
   /**
@@ -114,7 +121,7 @@ export class ProvenanceVerifier {
     line: string,
     lineNumber: number,
     report: VerificationReport,
-  ): { receipt: ProvenanceReceipt; jws: string; storedHash: string | null } | null {
+  ): { receipt: ProvenanceReceipt; storedHash: string | null } | null {
     let raw: Record<string, unknown>;
     try {
       raw = JSON.parse(line);
@@ -139,7 +146,7 @@ export class ProvenanceVerifier {
     }
     const stored = raw["receipt_hash"];
     const storedHash = typeof stored === "string" ? stored : null;
-    return { receipt, jws, storedHash };
+    return { receipt, storedHash };
   }
 
   /** Walk the DAG backwards from ``receiptHash`` to all roots. */
