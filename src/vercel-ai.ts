@@ -99,9 +99,9 @@ export class InMemorySink implements ReceiptSink {
 
 export type CapabilityVerdict = { allow: true } | { allow: false; reason: string };
 
-export interface CapabilityCheck {
-  (ctx: { tool: string; args: Record<string, unknown> }): CapabilityVerdict;
-}
+export type CapabilityCheck = (
+  ctx: { tool: string; args: Record<string, unknown> },
+) => CapabilityVerdict;
 
 export interface WrapToolsOptions {
   identity: AgentIdentity;
@@ -128,7 +128,7 @@ interface VercelTool {
   execute?: (
     args: Record<string, unknown>,
     options?: unknown,
-  ) => Promise<unknown> | unknown;
+  ) => unknown;
   // Pass-through for unknown extras (e.g. `experimental_toToolResultContent`).
   [k: string]: unknown;
 }
